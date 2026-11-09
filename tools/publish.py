@@ -9,6 +9,7 @@ def run():
     save(OUT/"cities.json",cities)
     save(OUT/"stations.json.gz",{k:v[:3] for k,v in stations.items()})
     hist=defaultdict(lambda:defaultdict(Counter))
+    timelines=defaultdict(list)
     months=[]
     for path in sorted(STORE.glob("????-??.json.gz")):
         month=path.name[:7]
@@ -26,12 +27,15 @@ def run():
             row.update(local=local,block=block)
             summary.append(row)
             for code,scale in [("all",r["s"]),*local.items()]:
-                if scale: hist[code][r["at"][:10]][scale]+=1
+                if scale:
+                    hist[code][r["at"][:10]][scale]+=1
+                    timelines[code].append([r["at"],scale,r["id"]])
         save(OUT/"months"/(month+".json.gz"),summary)
         for block,obs in details.items(): save(OUT/"map"/month/(block+".json.gz"),obs)
         months.append(month)
     for code,dates in hist.items():
         save(OUT/"counts"/(code+".json.gz"),dates)
+        save(OUT/"timeline"/(code+".json.gz"),sorted(timelines[code]))
     status=read(STORE/"status.json",{})
     save(OUT/"index.json",dict(months=months,counts=list(hist),years=read(STORE/"years.json",[]),
                                **{k:v for k,v in status.items() if k!="seen"}))
