@@ -567,8 +567,12 @@ function App() {
                 <div className="chartFilters" role="group" aria-label="日別グラフの期間" style={{margin: "16px 0"}}>
                   <button disabled={page >= lastPage} onClick={() => setPage(page + 1)}>← 前の30日</button>
                   <span aria-live="polite">{graphStart} 〜 {graphEnd}</span>
-                  <button disabled={page === 0} onClick={() => setPage(page - 1)}>次の30日 →</button>
-                  {page > 0 && <button onClick={() => setPage(0)}>直近30日に戻る</button>}
+                  {page > 0 && (
+                    <>
+                      <button onClick={() => setPage(page - 1)}>次の30日 →</button>
+                      <button onClick={() => setPage(0)}>直近30日に戻る</button>
+                    </>
+                  )}
                 </div>
               )}
               <Suspense fallback="グラフを準備中…">
