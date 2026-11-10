@@ -43,7 +43,7 @@ function App() {
   );
   const [from, setFrom] = useState(params.get("from") || shift(today, -29)),
     [to, setTo] = useState(params.get("to") || today);
-  const [tab, setTab] = useState("一覧"),
+  const [tab, setTab] = useState(params.get("view") === "daily" ? "グラフ" : "一覧"),
     [event, setEvent] = useState<EventRow | null>(null),
     [message, msg] = useState("");
   const [busy, setBusy] = useState(false),
@@ -54,6 +54,17 @@ function App() {
   const [hist, setHist] = useState<Histogram | null>(null),
     [mode, setMode] = useState("回数"),
     [unit, setUnit] = useState("日");
+  const [requestedPage, setPage] = useState(() => {
+    const page = Number(params.get("page"));
+    return params.get("view") === "daily" && Number.isSafeInteger(page) && page > 0 ? page : 0;
+  });
+  const daily = tab === "グラフ" && unit === "日" && mode !== "地震ごと";
+  const firstMonth = index?.months[0];
+  const lastPage = firstMonth
+    ? Math.max(0, Math.floor((Date.parse(today) - Date.parse(firstMonth + "-01")) / (30 * 86400000)))
+    : 0;
+  const page = Math.min(requestedPage, lastPage);
+  const dailyEnd = shift(today, -30 * page);
   const selection = useRef(0);
   const [query, setQuery] = useState("");
   const version = index?.updated || "";
@@ -231,6 +242,7 @@ function App() {
       min: String(min),
       period,
       ...(period === "指定" ? { from, to } : {}),
+      ...(daily ? { view: "daily", page: String(page) } : {}),
     }))
       url.searchParams.set(k, v);
     try {
@@ -251,6 +263,8 @@ function App() {
     }
     return String(n);
   }
+  const graphStart = daily ? shift(dailyEnd, -29) : start;
+  const graphEnd = daily ? dailyEnd : end;
   const graph = useMemo(() => {
     if (scatter)
       return { keys: points.map(([t]) => t), values: points.map(([, s]) => s) };
@@ -261,14 +275,14 @@ function App() {
     if (
       !hist ||
       !index ||
-      !/^\d{4}-\d\d-\d\d$/.test(start) ||
-      !/^\d{4}-\d\d-\d\d$/.test(end) ||
-      start < "1900-01-01" ||
-      end > "2200-12-31"
+      !/^\d{4}-\d\d-\d\d$/.test(graphStart) ||
+      !/^\d{4}-\d\d-\d\d$/.test(graphEnd) ||
+      graphStart < "1900-01-01" ||
+      graphEnd > "2200-12-31"
     )
       return { keys: [], values: [] };
     const firstObserved = Object.keys(hist).sort()[0] || "9999";
-    for (let d = start; d <= end; d = shift(d, 1)) {
+    for (let d = graphStart; d <= graphEnd; d = shift(d, 1)) {
       const key =
         unit === "年"
           ? d.slice(0, 4)
@@ -293,7 +307,7 @@ function App() {
         b.valid ? (mode === "回数" ? b.n : b.max || null) : null,
       ),
     };
-  }, [hist, index, mode, scatter, points, city, start, end, min, unit]);
+  }, [hist, index, mode, scatter, points, city, graphStart, graphEnd, min, unit]);
   function open(r: EventRow) {
     setEvent(r);
     setTab("震度地図");
@@ -367,7 +381,9 @@ function App() {
           <label>
             表示期間
             <select
-              value={period}
+              disabled={daily}
+              title={daily ? "日別グラフは30日ずつ表示します" : undefined}
+              value={daily ? "30日" : period}
               onChange={(e) => {
                 setPeriod(e.target.value);
                 if (e.target.value === "全期間") {
@@ -382,7 +398,7 @@ function App() {
             </select>
           </label>
           <button onClick={share}>条件を共有</button>
-          {period === "指定" && (
+          {!daily && period === "指定" && (
             <>
               <input
                 aria-label="開始日"
@@ -434,7 +450,7 @@ function App() {
           <div className="sectionhead">
             <h2>{tab === "一覧" ? "地震の履歴" : tab}</h2>
             <span>
-              {start} — {end}
+              {graphStart} — {graphEnd}
             </span>
           </div>
           {tab === "一覧" && (
@@ -547,6 +563,14 @@ function App() {
                   {target} · 震度{min}以上
                 </span>
               </div>
+              {daily && (
+                <div className="chartFilters" role="group" aria-label="日別グラフの期間" style={{margin: "16px 0"}}>
+                  <button disabled={page >= lastPage} onClick={() => setPage(page + 1)}>← 前の30日</button>
+                  <span aria-live="polite">{graphStart} 〜 {graphEnd}</span>
+                  <button disabled={page === 0} onClick={() => setPage(page - 1)}>次の30日 →</button>
+                  {page > 0 && <button onClick={() => setPage(0)}>直近30日に戻る</button>}
+                </div>
+              )}
               <Suspense fallback="グラフを準備中…">
                 <Chart
                   keys={graph.keys}
