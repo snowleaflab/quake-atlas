@@ -577,6 +577,7 @@ function App() {
               )}
               <Suspense fallback="グラフを準備中…">
                 <Chart
+                  daily={daily}
                   keys={graph.keys}
                   values={graph.values}
                   mode={mode}

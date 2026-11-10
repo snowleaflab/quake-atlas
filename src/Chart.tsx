@@ -17,11 +17,13 @@ use([
   CanvasRenderer,
 ]);
 export default function Chart({
+  daily,
   keys,
   values,
   mode,
   onSelect,
 }: {
+  daily: boolean;
   keys: string[];
   values: (number | null)[];
   mode: string;
@@ -35,7 +37,7 @@ export default function Chart({
     const scatter = mode === "地震ごと";
     chart.setOption({
       useUTC: true,
-      grid: { left: 52, right: 22, top: 40, bottom: 72 },
+      grid: { left: 52, right: 22, top: 40, bottom: daily ? 38 : 72 },
       tooltip: {
         trigger: "item",
         renderMode: "richText",
@@ -50,7 +52,15 @@ export default function Chart({
       xAxis: {
         type: scatter ? "time" : "category",
         data: scatter ? undefined : keys,
-        axisLabel: { hideOverlap: true, color: "#56676a" },
+        axisLabel: daily
+          ? {
+              interval: 0,
+              hideOverlap: false,
+              fontSize: 11,
+              color: "#56676a",
+              formatter: (date: string) => date.slice(5).replace("-", "/"),
+            }
+          : { hideOverlap: true, color: "#56676a" },
       },
       yAxis: {
         type: "value",
@@ -64,7 +74,7 @@ export default function Chart({
         },
         splitLine: { lineStyle: { color: "#e1e7e5" } },
       },
-      dataZoom: [{ type: "slider", height: 15, bottom: 12, showDetail: false }],
+      dataZoom: daily ? [] : [{ type: "slider", height: 15, bottom: 12, showDetail: false }],
       series: [
         {
           type: mode === "地震ごと" ? "scatter" : "bar",
@@ -84,12 +94,14 @@ export default function Chart({
       obs.disconnect();
       chart.dispose();
     };
-  }, [keys, values, mode, onSelect]);
+  }, [daily, keys, values, mode, onSelect]);
   return (
-    <div
-      ref={ref}
-      style={{ height: 365 }}
-      aria-label="期間別の震度と発生回数"
-    />
+    <div style={{ overflowX: daily ? "auto" : undefined }}>
+      <div
+        ref={ref}
+        style={{ height: 365, minWidth: daily ? 1064 : undefined }}
+        aria-label="期間別の震度と発生回数"
+      />
+    </div>
   );
 }
